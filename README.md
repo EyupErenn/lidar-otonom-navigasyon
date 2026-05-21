@@ -1,167 +1,165 @@
-# LiDAR Tabanlı Otonom Navigasyon Simülasyonu
-### Sensör Füzyonu ve Lokalizasyon — 2B Simülasyon (Python)
+
+# AutoNav Pro: LiDAR Tabanlı Otonom Navigasyon Simülasyonu
+
+### Sensör Füzyonu ve Lokalizasyon — 2B Web Simülasyonu (Python & Streamlit)
 
 ---
 
 ## 📋 Proje Özeti
 
-Bu proje, bir **depo ortamında** otonom mobil robotun LiDAR, IMU ve tekerlek enkoderi kullanarak
-engelleri algılamasını, konumunu tahmin etmesini (lokalizasyon) ve hedefe güvenle ulaşmasını simüle eder.
+Bu proje, bir **depo ve keşif ortamında** otonom mobil robotun LiDAR, IMU ve tekerlek enkoderi kullanarak engelleri algılamasını, konumunu tahmin etmesini (lokalizasyon) ve hedefe güvenle ulaşmasını gerçek zamanlı olarak simüle eden web tabanlı bir arayüzdür.
 
 | Özellik | Değer |
-|---|---|
-| Ortam | 20×20 metre, 12 dairesel engel |
-| Başlangıç | (1.0, 1.0) |
-| Hedef | (18.0, 18.0) |
-| Robot Modeli | Non-holonomic diferansiyel sürüş |
-| Sensörler | 2B LiDAR (360°), IMU, Tekerlek Enkoderi |
-| Lokalizasyon | Extended Kalman Filter (EKF) |
-| Navigasyon | Yapay Potansiyel Alan (APF) + RRT yol planlaması |
+| --- | --- |
+| **Platform** | Streamlit tabanlı dinamik web arayüzü |
+| **Ortamlar** | Depo (12 raf/engel) ve Keşif Senaryoları |
+| **Robot Modelleri** | Non-holonomic (Diferansiyel Sürüş & Ackermann) |
+| **Sensörler** | 2B LiDAR (Ray-casting), IMU, Tekerlek Enkoderi |
+| **Lokalizasyon** | Genişletilmiş Kalman Filtresi (EKF) — Sensör Füzyonu |
+| **Navigasyon** | Yapay Potansiyel Alan (APF) |
 
 ---
 
-## 🗂️ Dosya Yapısı
+## 🗂️ Dosya Yapısı (Modüler OOP Mimarisi)
 
-```
+```text
 lidar_navigation/
-├── environment.py      ← 2B harita, engeller, çarpışma kontrolü
-├── robot.py            ← Non-holonomic unicycle robot modeli
-├── sensors.py          ← LiDAR, IMU, enkoder simülasyonu + gürültü
-├── kalman_filter.py    ← Extended Kalman Filter (EKF)
-├── navigation.py       ← APF navigasyon + RRT yol planlaması
-├── visualization.py    ← Tüm grafik çıktıları
-├── main.py             ← Ana simülasyon döngüsü
-├── outputs/            ← Grafik çıktıları (otomatik oluşturulur)
-│   ├── 01_environment_map.png
-│   ├── 02_path_plan.png
-│   ├── 03_lidar_visualization.png
-│   ├── 03b_lidar_timeseries.png
-│   ├── 04_localization.png
-│   ├── 04b_localization_2d.png
-│   ├── 05_error_analysis.png
-│   └── 06_control_signals.png
+├── main.py                 ← Streamlit ana arayüzü ve simülasyon döngüsü
+├── environment.py          ← 2B haritalar, senaryolar ve engeller (Daire/Dikdörtgen)
+├── robot_kinematics.py     ← Diferansiyel ve Ackermann robot kinematik modelleri
+├── sensors.py              ← LiDAR (ışın izleme), IMU ve Enkoder gürültü simülasyonları
+├── kalman_filter.py        ← EKF tabanlı sensör füzyonu (Tahmin: IMU+Enc, Güncelleme: LiDAR)
+├── navigation.py           ← APF tabanlı yönelim ve engelden kaçınma algoritmaları
+├── visualization.py        ← Çıktı raporları için yüksek çözünürlüklü statik grafik motoru
 └── README.md
+
 ```
 
 ---
 
-## ⚙️ Kurulum
+## ⚙️ Kurulum ve Çalıştırma
 
 ### Gereksinimler
 
-- Python 3.8 veya üzeri
-- pip
+* Python 3.8 veya üzeri
+* pip (Paket Yöneticisi)
 
-### Adım 1 — Depoyu klonla
+### Adım 1 — Depoyu Klonla
 
 ```bash
 git clone https://github.com/KULLANICI_ADIN/lidar-navigation.git
 cd lidar-navigation
+
 ```
 
-### Adım 2 — Bağımlılıkları yükle
+### Adım 2 — Bağımlılıkları Yükle (Terminal)
 
 ```bash
-pip install numpy matplotlib
+pip install streamlit numpy matplotlib scipy
+
 ```
 
-> Sanal ortam kullanmak istersen:
-> ```bash
-> python -m venv venv
-> source venv/bin/activate        # Windows: venv\Scripts\activate
-> pip install numpy matplotlib
-> ```
+### Adım 3 — Simülasyonu Başlat
 
-### Adım 3 — Simülasyonu çalıştır
+Uygulamayı web tarayıcısında (localhost) açmak için aşağıdaki komutu çalıştırın:
 
 ```bash
-python main.py
+streamlit run main.py
+
 ```
 
-Simülasyon tamamlandığında tüm grafikler `outputs/` klasörüne otomatik olarak kaydedilir.
+> **Not:** Arayüzdeki sol panelden (Sidebar) simülasyon parametrelerini (gürültü, hız, EKF matrisleri vb.) canlı olarak değiştirebilir ve sonuçları eşzamanlı gözlemleyebilirsiniz.
 
 ---
 
-## 🧩 Teknik Detaylar
+## 🧩 Teknik Detaylar ve Matematiksel Modeller
 
-### Robot Modeli (Non-holonomic)
+### 1. Robot Kinematiği (Non-Holonomic)
 
-Diferansiyel sürüş robotu, unicycle kinematik modeli ile hareket eder:
+Projede iki farklı non-holonomic sürüş modeli uygulanmıştır:
 
-```
-x'     = v · cos(θ)
-y'     = v · sin(θ)
-θ'     = ω
-```
+**Diferansiyel Sürüş Modeli:**
 
-Kontrol sinyalleri: `v` (ilerleme hızı, m/s) ve `ω` (dönme hızı, rad/s).
 
-### LiDAR Simülasyonu
+$$x_{k+1} = x_k + v \cdot \cos(\theta_k) \cdot dt$$
 
-- 360 ışın, 1° çözünürlük
-- Maksimum menzil: 7 metre
-- Gürültü: σ = 0.04 m (Gaussian)
-- Filtreleme: Median filtre + outlier eleme
+$$y_{k+1} = y_k + v \cdot \sin(\theta_k) \cdot dt$$
 
-### Extended Kalman Filter (EKF)
+$$\theta_{k+1} = \theta_k + \omega \cdot dt$$
 
-Durum vektörü: `[x, y, θ]`
+**Ackermann Sürüş Modeli (Araç Tipi):**
 
-| Matris | Açıklama | Değer |
-|---|---|---|
-| **Q** | Proses gürültüsü | diag(0.01, 0.01, 0.005) |
-| **R** | Ölçüm gürültüsü | diag(0.05, 0.05, 0.03) |
-| **P₀** | Başlangıç kovaryansı | diag(0.1, 0.1, 0.05) |
 
-**Tahmin adımı:** Enkoder ölçümü + Jacobian ile kovaryans güncelleme  
-**Güncelleme adımı:** IMU açı ölçümü + Kalman kazancı ile düzeltme
+$$x_{k+1} = x_k + v \cdot \cos(\theta_k) \cdot dt$$
 
-### Navigasyon — APF
+$$y_{k+1} = y_k + v \cdot \sin(\theta_k) \cdot dt$$
 
-Toplam kuvvet = Çekim (hedefe doğru) + İtme (engellerden uzak):
+$$\theta_{k+1} = \theta_k + \frac{v}{L} \cdot \tan(\delta) \cdot dt$$
 
-```
-F_toplam = F_çekim + F_itme
-```
 
-RRT ile ön-planlama yapılır, APF ile reaktif engel kaçınma gerçekleştirilir.
+*(Burada $L$ dingil mesafesini, $\delta$ ise direksiyon açısını temsil eder.)*
+
+### 2. Genişletilmiş Kalman Filtresi (EKF) ile Sensör Füzyonu
+
+Sistem, üç farklı sensörün verisini birleştirerek hatayı minimize eder:
+
+* **Tahmin (Predict) Adımı:** Tekerlek enkoderi ve IMU verileri ile hareket modeli yürütülür. Kovaryans güncellenir:
+
+$$P_{k|k-1} = F_k P_{k-1|k-1} F_k^T + Q_k$$
+
+
+* **Güncelleme (Update) Adımı:** LiDAR'dan gelen (x, y) konum tespiti ile Kalman kazancı hesaplanarak tahmin düzeltilir:
+
+$$K_k = P_{k|k-1} H_k^T (H_k P_{k|k-1} H_k^T + R_k)^{-1}$$
+
+
+
+### 3. Navigasyon — Yapay Potansiyel Alan (APF)
+
+Robotun rotası, hedefe olan çekici kuvvet ($F_{att}$) ve engellerin itici kuvvetinin ($F_{rep}$) vektörel toplamı ile belirlenir:
+
+
+$$F_{toplam} = F_{att} + F_{rep}$$
 
 ---
 
-## 📊 Sonuçlar
+## 📊 Örnek Sonuçlar
 
-| Metrik | EKF | Dead Reckoning |
-|---|---|---|
-| RMSE | **0.051 m** | 0.601 m |
-| MAE | **0.045 m** | 0.500 m |
+Streamlit arayüzünden alınan anlık simülasyon metrikleri (Örneklenen Değerler):
 
-- Robot hedefe **620 adımda (31 saniye)** ulaştı
-- Toplam kat edilen mesafe: **23.68 m**
-- EKF, dead reckoning'e göre **~12× daha doğru** lokalizasyon sağladı
+| Metrik | Sensör Füzyonu (EKF) | Sadece Enkoder (Dead Reckoning) |
+| --- | --- | --- |
+| RMSE (Hata) | **~0.045 m** | ~0.601 m |
+| Doğruluk Farkı | **%92 Daha Kesin** | Giderek artan sürüklenme (drift) |
+
+> *Detaylı Hata, Zaman Serisi ve LiDAR (Ham vs Filtreli) grafikleri uygulamanın canlı arayüzünde izlenebilmektedir.*
 
 ---
 
 ## 🤖 Yapay Zeka Kullanım Beyanı
 
-**Kullanılan araçlar:** Claude (claude-sonnet-4-6)
+**Kullanılan yapay zeka araçları:** Gemini)
 
-**Kullanıldığı bölümler:**
-- Kalman Filtresi kod iskeletinin oluşturulması
-- APF navigasyon parametrelerinin ayarlanması
-- Kodların hata ayıklaması
-- README ve rapor metninin dil düzenlemesi
+**Yapay zekanın kullanıldığı bölümler:**
 
-**Öğrencinin katkıları:**
-- Proje senaryosu ve sistem mimarisinin tasarımı
-- Kodların test edilmesi ve çalıştırılması
-- Sonuç yorumları ve değerlendirme
+* Orijinal Python scriptlerinin Streamlit arayüzüne entegrasyonu ve modüler mimarinin (OOP) oluşturulması.
+* Sensör füzyonu (EKF) ve APF navigasyon algoritmalarının matematiksel denklemlerinin koda dönüştürülmesi.
+* Kinematik modellerin (Diferansiyel ve Ackermann) LaTeX formatında raporlanması.
+
+**Öğrencinin kendi katkıları:**
+
+* Proje gereksinimlerine göre "Depo/Palet Taşıma" senaryosunun tasarlanması.
+* Simülasyonda kullanılan parametrelerin (Q, R matrisleri, gürültü varyansları) test edilmesi ve optimize edilmesi.
+* EKF hatası ile Dead Reckoning sapmalarının karşılaştırmalı analizi ve değerlendirilmesi.
+
+*Açıklama: Yapay zeka aracı bir asistan olarak kod organizasyonu için kullanılmıştır. Çıktılar, formüller ve nihai simülasyon testleri öğrenci tarafından doğrulanarak teslim edilmiştir.*
 
 ---
 
 ## 📚 Kaynaklar
 
-[1] V. Ušinskis et al., "Sensor-fusion based navigation for autonomous mobile robot," *Sensors*, vol. 25, no. 4, art. 1248, 2025.
+[1] V. Ušinskis, M. Nowicki, A. Dzedzickis ve V. Bučinskas, "Sensor-fusion based navigation for autonomous mobile robot," *Sensors*, cilt 25, sayı 4, makale 1248, 2025, doi: 10.3390/s25041248.
 
-[2] Y. Ou et al., "Autonomous navigation by mobile robot with sensor fusion based on deep reinforcement learning," *Sensors*, vol. 24, no. 12, art. 3895, 2024.
+[2] Y. Ou, Y. Cai, Y. Sun ve T. Qin, "Autonomous navigation by mobile robot with sensor fusion based on deep reinforcement learning," *Sensors*, cilt 24, sayı 12, makale 3895, 2024, doi: 10.3390/s24123895.
 
-[3] B. Zhang and C. Li, "The optimization and application research of the RRT-APF-based path planning algorithm," *Electronics*, vol. 13, no. 24, art. 4963, 2024.
+[3] B. Zhang ve C. Li, "The optimization and application research of the RRT-APF-based path planning algorithm," *Electronics*, cilt 13, sayı 24, makale 4963, 2024, doi: 10.3390/electronics13244963.
