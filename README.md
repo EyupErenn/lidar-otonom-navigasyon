@@ -47,7 +47,7 @@ lidar_navigation/
 ### Adım 1 — Depoyu Klonla
 
 ```bash
-git clone https://github.com/KULLANICI_ADIN/lidar-navigation.git
+git clone https://github.com/EyupErenn/lidar-navigation.git
 cd lidar-navigation
 
 ```
